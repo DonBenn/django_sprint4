@@ -1,9 +1,11 @@
 from django.db import models  # type: ignore
 from django.contrib.auth import get_user_model  # type: ignore
 from django.urls import reverse  # type: ignore
+from django.db.models import Count  # type: ignore
 
 from core.models import PublishedAndCreatedModel
 from blog.constants import MAX_CHAR_FIELD_LENGTH
+
 
 User = get_user_model()
 
@@ -76,8 +78,19 @@ class Post(PublishedAndCreatedModel):
     def get_absolute_url(self):
         return reverse('blog:post_detail', kwargs={'pk': self.pk})
 
+    class SelectionManager(models.Manager):
+        def get_queryset(self):
+            return super().get_queryset().select_related(
+                'category', 'location', 'author'
+            ).order_by(
+                '-pub_date').annotate(
+                comment_count=Count('comments'))
 
-class Comments(models.Model):
+    objects = models.Manager()
+    selection = SelectionManager()
+
+
+class Comment(models.Model):
     text = models.TextField('Текст комментария')
     post = models.ForeignKey(
         Post,
@@ -89,7 +102,7 @@ class Comments(models.Model):
 
     class Meta:
         ordering = ('created_at',)
-        verbose_name = 'комментарии'
+        verbose_name = 'комментарий'
         verbose_name_plural = 'Комментарии'
 
     def __str__(self):

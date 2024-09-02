@@ -1,7 +1,7 @@
 from django import forms  # type: ignore
 from django.contrib.auth.models import User  # type: ignore
 
-from blog.models import Post, Comments
+from blog.models import Post, Comment
 
 
 class PostForm(forms.ModelForm):
@@ -21,8 +21,8 @@ class UserForm(forms.ModelForm):
         fields = ['first_name', 'last_name', 'username', 'email']
 
 
-class CommentsForm(forms.ModelForm):
+class CommentForm(forms.ModelForm):
 
     class Meta:
-        model = Comments
+        model = Comment
         fields = ('text',)
