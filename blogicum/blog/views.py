@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from django.views.generic import (  # type: ignore
     CreateView, DeleteView, DetailView, ListView, UpdateView
 )
@@ -11,11 +9,18 @@ from django.core.paginator import Paginator  # type: ignore
 from django.contrib.auth.decorators import login_required  # type: ignore
 from django.contrib.auth.mixins import (LoginRequiredMixin)  # type: ignore
 from django.core.exceptions import PermissionDenied  # type: ignore
+from django.utils import timezone  # type: ignore
 
 from blog.models import Post, Category, Comment
 from blog.constants import MAX_POSTS_ON_PAGE  # type: ignore
 from blog.forms import PostForm, UserForm, CommentForm
 from blog.mixins import OnlyAuthorMixin, PostMixin, PostFormMixin, CommentMixin
+
+
+def pagination(request, queryset, max_posts_on_page):
+    paginator = Paginator(queryset, max_posts_on_page)
+    page_number = request.GET.get('page')
+    return paginator.get_page(page_number)
 
 
 class PostCreateView(LoginRequiredMixin, PostMixin, PostFormMixin, CreateView):
@@ -30,11 +35,7 @@ class PostCreateView(LoginRequiredMixin, PostMixin, PostFormMixin, CreateView):
 
 class PostListView(PostMixin, ListView):
 
-    queryset = Post.selection.filter(
-        is_published=True,
-        category__is_published=True,
-        pub_date__date__lte=datetime.now(),
-    )
+    queryset = Post.selection.filtering_ordering()
     ordering = '-pub_date'
     paginate_by = MAX_POSTS_ON_PAGE
     template_name = 'blog/index.html'
@@ -63,7 +64,8 @@ class PostDetailView(PostMixin, DetailView):
 
     def dispatch(self, request, *args, **kwargs):
         object = self.get_object()
-        if not object.is_published and object.author != self.request.user:
+        if (not object.is_published or object.pub_date > timezone.now()) and (
+                object.author != self.request.user):
             raise Http404('Пост недоступен')
         return super().dispatch(request, *args, **kwargs)
 
@@ -89,11 +91,8 @@ class UserUpdateView(LoginRequiredMixin, UpdateView):
 def profile(request, username):
 
     user = get_object_or_404(User, username=username)
-    post_list = Post.selection.filter(
-        author__username=username)
-    paginator = Paginator(post_list, MAX_POSTS_ON_PAGE)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    post_list = user.posts(manager='selection').profile_ordering()
+    page_obj = pagination(request, post_list, MAX_POSTS_ON_PAGE)
     context = {'page_obj': page_obj,
                'profile': user}
     return render(request, 'blog/profile.html', context)
@@ -165,14 +164,8 @@ def category_posts(request, category_slug):
 
     category = get_object_or_404(
         Category, slug=category_slug, is_published=True)
-    post_detail = Post.objects.select_related(
-        'category', 'location').filter(
-            category=category,
-            pub_date__date__lte=datetime.now(),
-            is_published=True)
-    paginator = Paginator(post_detail, MAX_POSTS_ON_PAGE)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    post_detail = Post.selection.filtered_by_category(category)
+    page_obj = pagination(request, post_detail, MAX_POSTS_ON_PAGE)
 
     context = {'page_obj': page_obj,
                'category': category}

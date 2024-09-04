@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from django.db import models  # type: ignore
 from django.contrib.auth import get_user_model  # type: ignore
 from django.urls import reverse  # type: ignore
@@ -5,7 +7,6 @@ from django.db.models import Count  # type: ignore
 
 from core.models import PublishedAndCreatedModel
 from blog.constants import MAX_CHAR_FIELD_LENGTH
-
 
 User = get_user_model()
 
@@ -79,12 +80,34 @@ class Post(PublishedAndCreatedModel):
         return reverse('blog:post_detail', kwargs={'pk': self.pk})
 
     class SelectionManager(models.Manager):
-        def get_queryset(self):
-            return super().get_queryset().select_related(
+
+        def selection(self):
+            return self.select_related(
                 'category', 'location', 'author'
+            )
+
+        def filtering_ordering(self):
+            return self.selection().filter(
+                is_published=True,
+                category__is_published=True,
+                pub_date__date__lte=datetime.now(),
             ).order_by(
                 '-pub_date').annotate(
                 comment_count=Count('comments'))
+
+        def profile_ordering(self):
+            return self.order_by(
+                '-pub_date').annotate(
+                comment_count=Count('comments'))
+
+        def selection_for_category(self):
+            return self.select_related(
+                'category', 'location').filter(
+                    is_published=True,
+                    pub_date__date__lte=datetime.now())
+
+        def filtered_by_category(self, category):
+            return self.selection_for_category().filter(category=category)
 
     objects = models.Manager()
     selection = SelectionManager()
