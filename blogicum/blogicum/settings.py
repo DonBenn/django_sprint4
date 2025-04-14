@@ -9,6 +9,8 @@ DEBUG = True
 ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
+    'www.denibessono.pythonanywhere.com',
+    'denibessono.pythonanywhere.com',
 ]
 
 INSTALLED_APPS = [
